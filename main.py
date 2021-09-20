@@ -2,9 +2,11 @@ import discord
 import os
 import youtube_dl
 from discord.ext import commands,tasks
-import asyncio
+import asyncio # this is included with the latest versions, see issue https://github.com/Rapptz/discord.py/issues/375
 
-songQueue = []
+__TOKEN__ = 'Your Token Here'
+
+song_queue = []
 
 tasker = None
 
@@ -56,7 +58,7 @@ async def on_ready():
   print('------')
  
 
-@bot.command(name='leave', help='To make the bot leave the voice channel')
+@bot.command(name='leave', aliases=['l', 'exit'], help='To make the bot leave the voice channel')
 async def leave(ctx):
     voice_client = ctx.message.guild.voice_client
     if voice_client.is_connected():
@@ -66,12 +68,12 @@ async def leave(ctx):
 
 @bot.command(name='play', aliases=['p', 'play_song'], help='To play song')
 async def play(ctx, *, url:str):
-  global songQueue
+  global song_queue
   voice = discord.utils.get(bot.voice_clients, guild=ctx.guild)
   try :
     if(voice == None):
       if not ctx.message.author.voice:
-        await ctx.send("{} is not connected to a voice channel".format(ctx.message.author.name))
+        await ctx.send(f"{ctx.message.author.name} is not connected to a voice channel")
       else:
         channel = ctx.message.author.voice.channel
         await channel.connect()
@@ -80,48 +82,48 @@ async def play(ctx, *, url:str):
 
       voice_client = ctx.message.guild.voice_client
       if not voice_client.is_playing():
-        songQueue.clear()
+        song_queue.clear()
 
       player = await YTDLSource.from_url(url, loop=bot.loop, stream=True)
-      if len(songQueue) == 0:
+      if len(song_queue) == 0:
         await start_playing(ctx, player)
       else:
-        songQueue.append(player)
-        await ctx.send('**Queued at position {}:** {}'.format(len(songQueue)-1,player.title))
-  except:
-      await ctx.send("Error occured.")
+        song_queue.append(player)
+        await ctx.send(f"**Queued at position {len(song_queue)-1}:** {player.title}")
+  except Exception as e:
+      await ctx.send(f"Error occured: {e}")
 
 async def start_playing(ctx, player):
-    global songQueue
-    songQueue.append(player)
+    global song_queue
+    song_queue.append(player)
     global tasker
-    if(songQueue[0] == None):
+    if(song_queue[0] == None):
       return
     i = 0
-    while i <  len(songQueue):
+    while i < len(song_queue):
         try:
-            ctx.voice_client.play(songQueue[0], after=lambda e: print('Player error: %s' % e) if e else None)
-            await ctx.send('**Now playing:** {}'.format(songQueue[0].title))
-        except:
-            await ctx.send("Ok")
-        #await asyncio.sleep(songQueue[0].duration)
-        tasker = asyncio.create_task(coro(ctx,songQueue[0].duration))
+            ctx.voice_client.play(song_queue[0], after=lambda e: print('Player error: %s' % e) if e else None)
+            await ctx.send(f"**Now playing:** {song_queue[0].title}")
+        except Exception as e:
+            await ctx.send(f"Something went wrong: {e}")
+        #await asyncio.sleep(song_queue[0].duration)
+        tasker = asyncio.create_task(coro(ctx,song_queue[0].duration))
         try:
            await tasker
         except asyncio.CancelledError:
           print("Task cancelled")
-        if(len(songQueue) > 0):
-          songQueue.pop(0)
+        if(len(song_queue) > 0):
+          song_queue.pop(0)
 
 async def coro(ctx,duration):
   await asyncio.sleep(duration)
 
-@bot.command(name='queued', help='This command pauses the song')
+@bot.command(name='queued', aliases=['q', 'list'], help='This command displays the queue')
 async def queued(ctx):
-    global songQueue
+    global song_queue
     a = ""
     i = 0
-    for f in songQueue:
+    for f in song_queue:
       if i > 0:
        a = a + str(i) +". " + f.title + "\n "
       i += 1
@@ -148,10 +150,10 @@ async def resume(ctx):
 @bot.command(name='stop', help='Stops the song')
 async def stop(ctx):
     global tasker
-    global songQueue
+    global song_queue
     voice_client = ctx.message.guild.voice_client
     if voice_client.is_playing():
-        songQueue.clear()
+        song_queue.clear()
         voice_client.stop()
         tasker.cancel()
         await ctx.send("Stopped playing.")
@@ -170,4 +172,4 @@ async def skip(ctx):
         await ctx.send("The bot is not playing anything at the moment.")
 
 
-bot.run('TOKEN')
+bot.run(__TOKEN__)
